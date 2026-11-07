@@ -4,7 +4,9 @@ import datetime
 import json
 import os
 import urllib.request
+import zoneinfo
 
+LOCAL_TIME_ZONE = 'America/Chicago'
 GARMIN_API_URL = 'https://personal.connectapi.garmin.com'
 TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
 ZONE_SETTINGS_PATH = '/biometric-service/heartRateZones/v2'
@@ -15,8 +17,10 @@ WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Yesterday by the runner's UTC clock.
-    today = datetime.date.today()
+    # Yesterday in Chicago time.
+    chicago_zone = zoneinfo.ZoneInfo(LOCAL_TIME_ZONE)
+    now = datetime.datetime.now(chicago_zone)
+    today = now.date()
     one_day = datetime.timedelta(days=1)
     yesterday = today - one_day
     pull_day = yesterday.isoformat()
