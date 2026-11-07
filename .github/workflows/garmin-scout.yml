@@ -26,5 +26,7 @@ jobs:
       - name: Scout Garmin fields
         env:
           GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SCOUT_DAY: ${{ inputs.day }}
         run: python3 garmin/scout/scout.py
