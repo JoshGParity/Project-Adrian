@@ -9,6 +9,7 @@ import urllib.request
 GARMIN_API_URL = 'https://personal.connectapi.garmin.com'
 TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
 REQUEST_TIMEOUT_SECONDS = 30
+PAYLOAD_TABLE_PATH = '/rest/v1/discovery_garmin_raw_payloads'
 
 
 def main():
@@ -114,6 +115,30 @@ def scout_endpoint(endpoint, access_token):
     # Print every field name and its type, never the value.
     response_data = json.loads(response_bytes)
     print_fields('response', response_data)
+
+    # Save the raw answer to the locked discovery table.
+    save_payload(endpoint_name, response_data)
+
+
+def save_payload(endpoint_name, response_data):
+    # Build the row and its table address.
+    supabase_url = os.environ['SUPABASE_URL']
+    table_url = supabase_url + PAYLOAD_TABLE_PATH
+    secret_key = os.environ['SUPABASE_SECRET_KEY']
+    payload_row = {'endpoint': endpoint_name, 'payload': response_data}
+    row_json = json.dumps(payload_row)
+    row_bytes = row_json.encode()
+
+    # A failed write fails the run.
+    save_headers = {'apikey': secret_key, 'Content-Type': 'application/json'}
+    save_request = urllib.request.Request(
+        table_url,
+        data=row_bytes,
+        method='POST',
+        headers=save_headers,
+    )
+    response = urllib.request.urlopen(save_request, timeout=REQUEST_TIMEOUT_SECONDS)
+    response.close()
 
 
 def print_fields(field_path, value):
