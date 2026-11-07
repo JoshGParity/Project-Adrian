@@ -1,0 +1,26 @@
+name: Garmin daily pull
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pull-garmin-daily:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      # Get the pull script from the repo.
+      - name: Check out the repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # Write yesterday's row. The log shows the day only.
+      - name: Pull Garmin daily totals
+        env:
+          GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python3 garmin/daily/daily_pull.py

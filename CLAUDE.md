@@ -6,7 +6,7 @@ The repo for all of Josh's Claude Duet work: pipelines, scheduled GitHub Actions
 
 All Python here follows `docs/python_style.md`.
 
-- Applies everywhere: Shape of a function, Comments (the full-sentence rule, since there is no `views.py` here), Use / not, Names, Trust, and Grading.
+- Applies everywhere: Shape of a function, Comments (the Project-Adrian scripts row: one short sentence, about 8 words), Use / not, Names, Trust, and Grading.
 - Versuz only: the Django parts (views, models, `request.data`, `to_dict`, serializers, AuthView). Ignore them for scripts here.
 - A new style call from Josh goes in `docs/python_style.md` in the same task.
 
