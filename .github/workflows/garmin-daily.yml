@@ -2,7 +2,7 @@ name: Garmin daily pull
 
 on:
   schedule:
-    # Every day at 10:00 AM Chicago time, after the morning watch sync.
+    # Daily at 10:00 AM Chicago, after the watch syncs.
     - cron: '0 10 * * *'
       timezone: 'America/Chicago'
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Pull daily totals from Garmin and write one row per day. The log shows days only, never numbers.
+      # One row per day. The log shows days only.
       - name: Pull Garmin daily totals
         env:
           GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}

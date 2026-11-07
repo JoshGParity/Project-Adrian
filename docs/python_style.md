@@ -23,6 +23,7 @@ Part 1 is the rules. Part 2 is the A/B test (2026-10-12) the rules came from.
 |---|---|
 | `views.py` | Five words or less above each line that does something. One per call inside a query chain too. |
 | Everything else (models, helpers, games, admin) | A full sentence above each step, plain words. |
+| Project-Adrian scripts | One short sentence above each step, about 8 words at most. Skip it when the step reads plainly. |
 | Anywhere | Never trailing. No comment that restates an obvious line. Model fields get none. |
 
 ### Use / not
@@ -213,3 +214,4 @@ Deck: "views.py Style A/B". Every view and helper once, A and B differing on one
 | 2026-10-05 | "You can still use one function call just use one line per param" on PATCH. |
 | 2026-10-05 | "Think bigger than just this one spot though - this is a coding style shift." |
 | 2026-10-17 | "Loud no-reason comments" rejected. Model fields bare. |
+| 2026-11-07 | "code styling push back - too long of comments" on the Garmin daily pull. Script comments: about 8 words, none that restate the code. |
