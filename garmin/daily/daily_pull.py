@@ -15,7 +15,7 @@ WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Yesterday by UTC, matching Chicago at 10 AM.
+    # Yesterday by the runner's UTC clock.
     today = datetime.date.today()
     one_day = datetime.timedelta(days=1)
     yesterday = today - one_day

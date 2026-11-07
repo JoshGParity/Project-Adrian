@@ -1,10 +1,6 @@
 name: Garmin daily pull
 
 on:
-  schedule:
-    # Daily at 10:00 AM Chicago, after the watch syncs.
-    - cron: '0 10 * * *'
-      timezone: 'America/Chicago'
   workflow_dispatch:
 
 permissions:
