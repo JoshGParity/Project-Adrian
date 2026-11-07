@@ -8,7 +8,7 @@ import urllib.request
 
 PING_TIMEOUT_SECONDS = 90
 INSERT_TIMEOUT_SECONDS = 20
-PING_TABLE_PATH = '/rest/v1/keepalive_pings'
+PING_TABLE_PATH = '/rest/v1/versuz_keepalive_pings'
 
 
 def main():
