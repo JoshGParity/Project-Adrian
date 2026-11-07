@@ -1,0 +1,39 @@
+name: Stocks daily prices
+
+on:
+  workflow_dispatch:
+    inputs:
+      trade_date:
+        description: 'Trading day as YYYY-MM-DD. Blank for the last weekday.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  pull-prices:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      # Pandas reads the Wikipedia member table.
+      - name: Install pandas
+        run: pip install pandas==3.1.1 lxml==6.1.3
+
+      - name: Pull closes and save picks
+        env:
+          TRADE_DATE: ${{ inputs.trade_date }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python stocks/daily_prices/daily_prices.py
