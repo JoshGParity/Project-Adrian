@@ -53,12 +53,12 @@ def ping_versuz():
 
 
 def write_ping_row(ping_row):
-    # Build the table address in the Project Adrian logging project.
-    log_supabase_url = os.environ['LOG_SUPABASE_URL']
-    table_url = log_supabase_url + PING_TABLE_PATH
+    # Build the table address in Project Adrian.
+    supabase_url = os.environ['SUPABASE_URL']
+    table_url = supabase_url + PING_TABLE_PATH
 
-    # Read the logging project's secret key.
-    secret_key = os.environ['LOG_SUPABASE_SECRET_KEY']
+    # Read Project Adrian's secret key.
+    secret_key = os.environ['SUPABASE_SECRET_KEY']
 
     # Put the ping row in a JSON body. The table fills in the time.
     row_json = json.dumps(ping_row)
