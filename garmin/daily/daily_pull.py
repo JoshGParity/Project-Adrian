@@ -15,33 +15,20 @@ WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Pick the day to pull.
-    pull_day = pick_pull_day()
+    # Yesterday by UTC, matching Chicago at 10 AM.
+    today = datetime.date.today()
+    one_day = datetime.timedelta(days=1)
+    yesterday = today - one_day
+    pull_day = yesterday.isoformat()
 
     # Trade the Garmin key for a token.
     access_token = get_access_token()
 
-    # Read the zone floors once per run.
+    # Write yesterday's row. Log the day only.
     zone_floors = get_zone_floors(access_token)
-
-    # Write the day's row. Log the day only.
     daily_row = build_daily_row(pull_day, zone_floors, access_token)
     write_daily_row(daily_row)
     print(f'Wrote {pull_day}.')
-
-
-def pick_pull_day():
-    # Use the typed day. A bad date crashes.
-    typed_day = os.environ['PULL_DAY']
-    if typed_day != '':
-        pull_date = datetime.date.fromisoformat(typed_day)
-        return pull_date.isoformat()
-
-    # Otherwise yesterday. No backfill.
-    today = datetime.date.today()
-    one_day = datetime.timedelta(days=1)
-    yesterday = today - one_day
-    return yesterday.isoformat()
 
 
 def get_access_token():

@@ -6,11 +6,6 @@ on:
     - cron: '0 10 * * *'
       timezone: 'America/Chicago'
   workflow_dispatch:
-    inputs:
-      day:
-        description: 'One day to pull, as YYYY-MM-DD. Leave blank for yesterday.'
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -26,11 +21,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # One row per day. The log shows days only.
+      # Write yesterday's row. The log shows the day only.
       - name: Pull Garmin daily totals
         env:
           GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          PULL_DAY: ${{ inputs.day }}
         run: python3 garmin/daily/daily_pull.py
