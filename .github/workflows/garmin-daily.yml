@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       day:
-        description: 'One day to pull, as YYYY-MM-DD. Leave blank for the last 3 days.'
+        description: 'One day to pull, as YYYY-MM-DD. Leave blank for yesterday.'
         required: false
         default: ''
 

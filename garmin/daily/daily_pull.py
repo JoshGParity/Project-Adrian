@@ -10,14 +10,13 @@ TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
 ZONE_SETTINGS_PATH = '/biometric-service/heartRateZones/v2'
 ZONE_SETTINGS_SPORT = 'DEFAULT'
 DAILY_TABLE_PATH = '/rest/v1/garmin_daily'
-DAYS_TO_PULL = 3
 GARMIN_TIMEOUT_SECONDS = 30
 WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Pick the days to pull.
-    pull_days = pick_pull_days()
+    # Pick the day to pull.
+    pull_day = pick_pull_day()
 
     # Trade the Garmin key for a token.
     access_token = get_access_token()
@@ -25,31 +24,24 @@ def main():
     # Read the zone floors once per run.
     zone_floors = get_zone_floors(access_token)
 
-    # Write one row per day. Log days only.
-    for pull_day in pull_days:
-        daily_row = build_daily_row(pull_day, zone_floors, access_token)
-        write_daily_row(daily_row)
-        print(f'Wrote {pull_day}.')
+    # Write the day's row. Log the day only.
+    daily_row = build_daily_row(pull_day, zone_floors, access_token)
+    write_daily_row(daily_row)
+    print(f'Wrote {pull_day}.')
 
 
-def pick_pull_days():
+def pick_pull_day():
     # Use the typed day. A bad date crashes.
     typed_day = os.environ['PULL_DAY']
     if typed_day != '':
         pull_date = datetime.date.fromisoformat(typed_day)
-        return [pull_date.isoformat()]
+        return pull_date.isoformat()
 
-    # Otherwise the last few days, oldest first.
+    # Otherwise yesterday. No backfill.
     today = datetime.date.today()
-    time_back = datetime.timedelta(days=DAYS_TO_PULL)
-    first_date = today - time_back
-    pull_days = []
-    for i in range(DAYS_TO_PULL):
-        time_forward = datetime.timedelta(days=i)
-        pull_date = first_date + time_forward
-        pull_days.append(pull_date.isoformat())
-
-    return pull_days
+    one_day = datetime.timedelta(days=1)
+    yesterday = today - one_day
+    return yesterday.isoformat()
 
 
 def get_access_token():
