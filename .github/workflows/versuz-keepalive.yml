@@ -1,0 +1,29 @@
+name: Versuz keep-alive
+
+on:
+  schedule:
+    # Every 10 minutes at :03, :13 and so on, from 9:03 AM to 8:53 PM Chicago time.
+    - cron: '3-59/10 9-20 * * *'
+      timezone: 'America/Chicago'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-versuz:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      # Get the keep-alive script from the repo.
+      - name: Check out the repo
+        uses: actions/checkout@v5
+
+      # Ping Versuz once and write one row to the ping table.
+      - name: Ping Versuz
+        env:
+          VERSUZ_API_BASE_URL: ${{ vars.VERSUZ_API_BASE_URL }}
+          VERSUZ_PING_PATH: ${{ vars.VERSUZ_PING_PATH }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python3 versuz/keepalive/keepalive.py
