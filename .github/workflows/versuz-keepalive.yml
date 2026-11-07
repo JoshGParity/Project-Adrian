@@ -2,9 +2,8 @@ name: Versuz keep-alive
 
 on:
   schedule:
-    # Every 10 minutes at :03, :13 and so on, from 9:03 AM to 8:53 PM Chicago time.
-    - cron: '3-59/10 9-20 * * *'
-      timezone: 'America/Chicago'
+    # UTC for 9 AM to 9 PM Central; shift at DST.
+    - cron: '3-59/10 0-2,15-23 * * *'
   workflow_dispatch:
 
 permissions:
