@@ -1,4 +1,4 @@
-"""Pull daily steps, sleep score and minutes per heart-rate zone from Garmin, and write one row per day to Supabase."""
+"""Pull Garmin daily totals and write one row per day to Supabase."""
 
 import datetime
 import json
@@ -12,7 +12,7 @@ ZONE_SETTINGS_SPORT = 'DEFAULT'
 DAILY_TABLE_PATH = '/rest/v1/garmin_daily'
 DAYS_TO_PULL = 3
 GARMIN_TIMEOUT_SECONDS = 30
-INSERT_TIMEOUT_SECONDS = 20
+WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
@@ -40,11 +40,14 @@ def pick_pull_days():
         return [pull_date.isoformat()]
 
     # Otherwise pull the last few days before today by the runner's clock, which is UTC, so late watch syncs fill in.
+    # Oldest goes first, so a day Garmin hasn't finished yet only stops the newest row.
     today = datetime.date.today()
+    time_back = datetime.timedelta(days=DAYS_TO_PULL)
+    first_date = today - time_back
     pull_days = []
-    for days_back in range(1, DAYS_TO_PULL + 1):
-        time_back = datetime.timedelta(days=days_back)
-        pull_date = today - time_back
+    for i in range(DAYS_TO_PULL):
+        time_forward = datetime.timedelta(days=i)
+        pull_date = first_date + time_forward
         pull_days.append(pull_date.isoformat())
 
     return pull_days
@@ -242,7 +245,7 @@ def write_daily_row(daily_row):
     )
 
     # Send the write. A failed write crashes here, so the run goes red.
-    response = urllib.request.urlopen(write_request, timeout=INSERT_TIMEOUT_SECONDS)
+    response = urllib.request.urlopen(write_request, timeout=WRITE_TIMEOUT_SECONDS)
     response.close()
 
 
