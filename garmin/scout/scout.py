@@ -26,10 +26,11 @@ def main():
 
 
 def pick_scout_day():
-    # Use the day typed into the run form when there is one.
+    # Use the day typed into the run form when there is one. A day that isn't YYYY-MM-DD crashes here, before it reaches a Garmin address.
     typed_day = os.environ['SCOUT_DAY']
     if typed_day != '':
-        return typed_day
+        scout_date = datetime.date.fromisoformat(typed_day)
+        return scout_date.isoformat()
 
     # Otherwise use yesterday by the runner's clock, which is UTC.
     today = datetime.date.today()
@@ -111,15 +112,20 @@ def scout_endpoint(endpoint, access_token):
         return
 
     # Print every field name and its type, never the value.
-    response_json = json.loads(response_bytes)
-    print_fields('response', response_json)
+    response_data = json.loads(response_bytes)
+    print_fields('response', response_data)
 
 
 def print_fields(field_path, value):
     # A dict prints nothing itself. Each of its keys is walked as a field of its own.
     if isinstance(value, dict):
         for key in value:
-            child_path = field_path + '.' + key
+            # A key that starts with a digit is a time or a reading, not a field name, so it prints as <number>.
+            key_name = key
+            if key[0].isdigit():
+                key_name = '<number>'
+
+            child_path = field_path + '.' + key_name
             print_fields(child_path, value[key])
         return
 

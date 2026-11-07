@@ -19,6 +19,8 @@ jobs:
       # Get the scout script from the repo.
       - name: Check out the repo
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       # Pull one day from Garmin and print field names only. Nothing is stored.
       - name: Scout Garmin fields
