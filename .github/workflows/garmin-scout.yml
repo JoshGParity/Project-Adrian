@@ -1,0 +1,28 @@
+name: Garmin scout
+
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'Day to scout, as YYYY-MM-DD. Leave blank for yesterday.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  scout-garmin:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      # Get the scout script from the repo.
+      - name: Check out the repo
+        uses: actions/checkout@v5
+
+      # Pull one day from Garmin and print field names only. Nothing is stored.
+      - name: Scout Garmin fields
+        env:
+          GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
+          SCOUT_DAY: ${{ inputs.day }}
+        run: python3 garmin/scout/scout.py
