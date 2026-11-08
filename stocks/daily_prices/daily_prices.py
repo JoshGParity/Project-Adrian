@@ -17,13 +17,14 @@ REQUEST_TIMEOUT_SECONDS = 60
 def main():
     trade_date = pick_trade_date()
 
-    # Replace the member list with Wikipedia's.
+    # Upsert Wikipedia's members. Keep flags stay as set.
     member_rows = get_member_rows()
-    send_to_supabase('DELETE', '/rest/v1/stocks_sp500_members?ticker=not.is.null')
     send_to_supabase('POST', '/rest/v1/stocks_sp500_members', member_rows)
 
-    # Store the day's member closes.
-    price_rows = get_price_rows(trade_date, member_rows)
+    # Store the day's closes for kept members.
+    kept_path = '/rest/v1/stocks_sp500_members?select=ticker&keep=is.true'
+    kept_rows = send_to_supabase('GET', kept_path)
+    price_rows = get_price_rows(trade_date, kept_rows)
     send_to_supabase('POST', '/rest/v1/stocks_daily_prices', price_rows)
 
     # Keep only the latest 30 trading days.
@@ -71,7 +72,7 @@ def get_member_rows():
     return member_rows
 
 
-def get_price_rows(trade_date, member_rows):
+def get_price_rows(trade_date, kept_rows):
     # One Massive call returns every US stock.
     grouped_path = f'/v2/aggs/grouped/locale/us/market/stocks/{trade_date}'
     massive_url = MASSIVE_API_URL + grouped_path
@@ -83,14 +84,14 @@ def get_price_rows(trade_date, member_rows):
     response.close()
     massive_data = json.loads(response_bytes)
 
-    member_tickers = set()
-    for member_row in member_rows:
-        member_tickers.add(member_row['ticker'])
+    kept_tickers = set()
+    for kept_row in kept_rows:
+        kept_tickers.add(kept_row['ticker'])
 
-    # Keep members only. T is the ticker, c the close.
+    # Kept members only. T is the ticker, c the close.
     price_rows = []
     for result in massive_data['results']:
-        if result['T'] in member_tickers:
+        if result['T'] in kept_tickers:
             price_row = {'ticker': result['T'], 'trade_date': trade_date, 'close': result['c']}
             price_rows.append(price_row)
     return price_rows
