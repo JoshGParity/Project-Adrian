@@ -13,5 +13,6 @@ All Python here follows `docs/python_style.md`.
 ## Working rules
 
 - Secrets live only in GitHub encrypted secrets, read at run time from the environment. Never write a key, password or token into a file, a log or a commit.
+- One exception: the GitHub dispatch token lives in Supabase Vault as `github_dispatch_token`, so Supabase cron can start workflows.
 - Plan first. Josh signs off on a plan before code is committed, a workflow is turned on or a table is created.
 - Say "I don't know" rather than guess, and cite official docs for any limit or behaviour you rely on.
