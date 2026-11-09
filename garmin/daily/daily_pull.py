@@ -17,22 +17,32 @@ WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Yesterday in Chicago time.
+    pull_day = pick_pull_day()
+
+    # Trade the Garmin key for a token.
+    access_token = get_access_token()
+
+    # Write the day's row. Log the day only.
+    zone_floors = get_zone_floors(access_token)
+    daily_row = build_daily_row(pull_day, zone_floors, access_token)
+    write_daily_row(daily_row)
+    print(f'Wrote {pull_day}.')
+
+
+def pick_pull_day():
+    # A typed day is for backfills. Bad dates crash.
+    typed_day = os.environ['PULL_DAY']
+    if typed_day != '':
+        typed_date = datetime.date.fromisoformat(typed_day)
+        return typed_date.isoformat()
+
+    # Otherwise yesterday in Chicago time.
     chicago_zone = zoneinfo.ZoneInfo(LOCAL_TIME_ZONE)
     now = datetime.datetime.now(chicago_zone)
     today = now.date()
     one_day = datetime.timedelta(days=1)
     yesterday = today - one_day
-    pull_day = yesterday.isoformat()
-
-    # Trade the Garmin key for a token.
-    access_token = get_access_token()
-
-    # Write yesterday's row. Log the day only.
-    zone_floors = get_zone_floors(access_token)
-    daily_row = build_daily_row(pull_day, zone_floors, access_token)
-    write_daily_row(daily_row)
-    print(f'Wrote {pull_day}.')
+    return yesterday.isoformat()
 
 
 def get_access_token():
