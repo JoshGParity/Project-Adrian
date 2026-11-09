@@ -82,6 +82,7 @@ def build_daily_row(pull_day, zone_floors, access_token):
     steps = get_steps(pull_day, access_token)
     sleep_score = get_sleep_score(pull_day, access_token)
     zone_minutes = get_zone_minutes(pull_day, zone_floors, access_token)
+    body_battery = get_body_battery(pull_day, access_token)
 
     # Slot 0 is time below zone 1.
     daily_row = {
@@ -94,6 +95,11 @@ def build_daily_row(pull_day, zone_floors, access_token):
         'zone3_minutes': zone_minutes[3],
         'zone4_minutes': zone_minutes[4],
         'zone5_minutes': zone_minutes[5],
+        'body_battery_high': body_battery['maxValue'],
+        'body_battery_low': body_battery['minValue'],
+        'body_battery_end': body_battery['latestValue'],
+        'body_battery_charged': body_battery['chargedValue'],
+        'body_battery_drained': body_battery['drainedValue'],
     }
     return daily_row
 
@@ -174,6 +180,15 @@ def pick_zone(heart_rate, zone_floors):
             zone = i + 1
 
     return zone
+
+
+def get_body_battery(pull_day, access_token):
+    # The daily summary holds one day.
+    summary_path = f'/usersummary-service/v2/dailysummaries?startDate={pull_day}&endDate={pull_day}'
+    summary_data = get_garmin_data(summary_path, access_token)
+    day_summary = summary_data['data'][0]
+    body_battery = day_summary['bodyBattery']
+    return body_battery
 
 
 def get_garmin_data(path, access_token):
