@@ -17,22 +17,32 @@ WRITE_TIMEOUT_SECONDS = 20
 
 
 def main():
-    # Yesterday in Chicago time.
+    pull_day = pick_pull_day()
+
+    # Trade the Garmin key for a token.
+    access_token = get_access_token()
+
+    # Write the day's row. Log the day only.
+    zone_floors = get_zone_floors(access_token)
+    daily_row = build_daily_row(pull_day, zone_floors, access_token)
+    write_daily_row(daily_row)
+    print(f'Wrote {pull_day}.')
+
+
+def pick_pull_day():
+    # A typed day is for backfills. Bad dates crash.
+    typed_day = os.environ['PULL_DAY']
+    if typed_day != '':
+        typed_date = datetime.date.fromisoformat(typed_day)
+        return typed_date.isoformat()
+
+    # Otherwise yesterday in Chicago time.
     chicago_zone = zoneinfo.ZoneInfo(LOCAL_TIME_ZONE)
     now = datetime.datetime.now(chicago_zone)
     today = now.date()
     one_day = datetime.timedelta(days=1)
     yesterday = today - one_day
-    pull_day = yesterday.isoformat()
-
-    # Trade the Garmin key for a token.
-    access_token = get_access_token()
-
-    # Write yesterday's row. Log the day only.
-    zone_floors = get_zone_floors(access_token)
-    daily_row = build_daily_row(pull_day, zone_floors, access_token)
-    write_daily_row(daily_row)
-    print(f'Wrote {pull_day}.')
+    return yesterday.isoformat()
 
 
 def get_access_token():
@@ -82,6 +92,7 @@ def build_daily_row(pull_day, zone_floors, access_token):
     steps = get_steps(pull_day, access_token)
     sleep_score = get_sleep_score(pull_day, access_token)
     zone_minutes = get_zone_minutes(pull_day, zone_floors, access_token)
+    body_battery = get_body_battery(pull_day, access_token)
 
     # Slot 0 is time below zone 1.
     daily_row = {
@@ -94,6 +105,11 @@ def build_daily_row(pull_day, zone_floors, access_token):
         'zone3_minutes': zone_minutes[3],
         'zone4_minutes': zone_minutes[4],
         'zone5_minutes': zone_minutes[5],
+        'body_battery_high': body_battery['maxValue'],
+        'body_battery_low': body_battery['minValue'],
+        'body_battery_end': body_battery['latestValue'],
+        'body_battery_charged': body_battery['chargedValue'],
+        'body_battery_drained': body_battery['drainedValue'],
     }
     return daily_row
 
@@ -174,6 +190,15 @@ def pick_zone(heart_rate, zone_floors):
             zone = i + 1
 
     return zone
+
+
+def get_body_battery(pull_day, access_token):
+    # The daily summary holds one day.
+    summary_path = f'/usersummary-service/v2/dailysummaries?startDate={pull_day}&endDate={pull_day}'
+    summary_data = get_garmin_data(summary_path, access_token)
+    day_summary = summary_data['data'][0]
+    body_battery = day_summary['bodyBattery']
+    return body_battery
 
 
 def get_garmin_data(path, access_token):
