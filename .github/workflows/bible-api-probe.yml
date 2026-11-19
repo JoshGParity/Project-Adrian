@@ -16,8 +16,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # One read-only call. The key never prints.
+      # One read-only call, saved to Supabase.
       - name: List Bibles once
         env:
           BIBLE_API_KEY: ${{ secrets.BIBLE_API_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python3 bible/api_probe/api_probe.py
