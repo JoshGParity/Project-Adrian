@@ -16,3 +16,4 @@ All Python here follows `docs/python_style.md`.
 - One exception: the GitHub dispatch token lives in Supabase Vault as `github_dispatch_token`, so Supabase cron can start workflows.
 - Plan first. Josh signs off on a plan before code is committed, a workflow is turned on or a table is created.
 - Say "I don't know" rather than guess, and cite official docs for any limit or behaviour you rely on.
+- API test PRs merge without asking Josh. Remove the test code in a follow-up PR once it has run. Keep the samples it saved in Supabase; never delete them.
