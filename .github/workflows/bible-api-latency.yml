@@ -1,0 +1,28 @@
+name: Bible API latency test
+
+on:
+  # Hourly at :55, 7:55 AM to 6:55 PM Chicago.
+  schedule:
+    - cron: '55 13-23,0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  time-bible-api:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # Three timed calls, each saved to Supabase.
+      - name: Time three calls
+        env:
+          BIBLE_API_KEY: ${{ secrets.BIBLE_API_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python3 bible/api_latency/api_latency.py
