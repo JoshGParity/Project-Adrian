@@ -1,9 +1,7 @@
 name: Bible API latency test
 
 on:
-  # Hourly at :55, 7:55 AM to 6:55 PM Chicago.
-  schedule:
-    - cron: '55 13-23,0 * * *'
+  # Supabase cron starts it; GitHub drops schedules.
   workflow_dispatch:
 
 permissions:
