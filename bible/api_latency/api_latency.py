@@ -6,14 +6,15 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 API_BASE_URL = 'https://rest.api.bible'
 KJV_BIBLE_ID = 'de4e12af7f28f599-02'
 SAMPLES_TABLE_PATH = '/rest/v1/versuz_bible_api_samples'
 REQUEST_TIMEOUT_SECONDS = 30
-TEST_START = datetime.datetime(2026, 11, 19, tzinfo=datetime.timezone.utc)
-TEST_END = datetime.datetime(2026, 11, 20, 1, tzinfo=datetime.timezone.utc)
+TEST_START = datetime.datetime(2026, 11, 20, tzinfo=datetime.timezone.utc)
+TEST_END = datetime.datetime(2026, 11, 21, tzinfo=datetime.timezone.utc)
 FIRST_SLOT_HOUR = 13
 
 
@@ -23,6 +24,11 @@ def main():
     # Outside the test window, make no calls.
     if now < TEST_START or now >= TEST_END:
         print(f'Outside the test window at {now.isoformat()}. No calls made.')
+        return
+
+    # A repeat start in the same hour does nothing.
+    if hour_already_saved(now):
+        print('This hour is already saved. No calls made.')
         return
 
     run_number = calculate_run_number(now)
@@ -162,6 +168,26 @@ def read_x_cache(header_pairs):
         if header_pair['name'].lower() == 'x-cache':
             return header_pair['value']
     return 'none'
+
+
+def hour_already_saved(now):
+    supabase_url = os.environ['SUPABASE_URL']
+    secret_key = os.environ['SUPABASE_SECRET_KEY']
+
+    hour_start = now.replace(minute=0, second=0, microsecond=0)
+    quoted_hour_start = urllib.parse.quote(hour_start.isoformat(), safe='')
+
+    # Only this test saves the bare Bible list path.
+    query = f'?select=id&endpoint=eq./v1/bibles&called_at=gte.{quoted_hour_start}&limit=1'
+    read_url = supabase_url + SAMPLES_TABLE_PATH + query
+
+    read_headers = {'apikey': secret_key}
+    read_request = urllib.request.Request(read_url, headers=read_headers)
+
+    response = urllib.request.urlopen(read_request, timeout=REQUEST_TIMEOUT_SECONDS)
+    found_rows = json.loads(response.read())
+    response.close()
+    return len(found_rows) > 0
 
 
 def save_sample(sample_row):
