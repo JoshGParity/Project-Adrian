@@ -1,4 +1,4 @@
-name: Garmin activity scout
+name: Garmin activity file test
 
 on:
   workflow_dispatch:
@@ -7,19 +7,19 @@ permissions:
   contents: read
 
 jobs:
-  scout-garmin-activities:
+  save-garmin-activity-file:
     runs-on: ubuntu-slim
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      # Save 30 days of activities, raw, to Supabase.
-      - name: Save activity samples
+      # Save one activity's detail and file to Supabase.
+      - name: Save the activity file
         env:
           GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python3 garmin/activity_scout/activity_scout.py
+        run: python3 garmin/activity_file_test/activity_file_test.py
