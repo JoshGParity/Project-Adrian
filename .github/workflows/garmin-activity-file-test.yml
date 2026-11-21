@@ -16,7 +16,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Save one activity's detail and file to Supabase.
+      # Save one activity's file to Supabase.
       - name: Save the activity file
         env:
           GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
