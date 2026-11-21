@@ -18,7 +18,8 @@ WRITE_TIMEOUT_SECONDS = 20
 
 # Each user's Garmin key is its own secret.
 USERS = [
-    {'first_name': 'Josh', 'key_name': 'GARMIN_KEY_JOSH'},
+    {'first_name': 'Josh', 'key_name': 'GARMIN_CONNECT_KEY'},
+    {'first_name': 'Sydney', 'key_name': 'GARMIN_CONNECT_KEY_SYDNEY'},
 ]
 
 
@@ -67,8 +68,13 @@ def find_yesterday():
 
 
 def pull_user(user, pull_days):
-    # Trade this user's key for a token.
+    # A user with no key yet is skipped.
     garmin_key = os.environ[user['key_name']]
+    if garmin_key == '':
+        print(f'Skipped {user["first_name"]}: no Garmin key.')
+        return
+
+    # Trade this user's key for a token.
     access_token = get_access_token(garmin_key)
 
     # Write each day, then its activities.

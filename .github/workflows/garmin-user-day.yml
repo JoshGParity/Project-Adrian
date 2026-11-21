@@ -29,7 +29,8 @@ jobs:
       # Write each user's days and activities. Logs show days and counts only.
       - name: Pull Garmin user days
         env:
-          GARMIN_KEY_JOSH: ${{ secrets.GARMIN_CONNECT_KEY }}
+          GARMIN_CONNECT_KEY: ${{ secrets.GARMIN_CONNECT_KEY }}
+          GARMIN_CONNECT_KEY_SYDNEY: ${{ secrets.GARMIN_CONNECT_KEY_SYDNEY }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           START_DAY: ${{ inputs.start_day }}
