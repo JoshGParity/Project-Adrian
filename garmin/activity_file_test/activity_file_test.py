@@ -1,4 +1,4 @@
-"""Save one Garmin activity's detail and file, raw, once."""
+"""Save one Garmin activity's file, raw, once."""
 
 import base64
 import json
@@ -13,6 +13,9 @@ ACTIVITY_ID = 25155176957
 GARMIN_TIMEOUT_SECONDS = 30
 WRITE_TIMEOUT_SECONDS = 20
 
+# Garmin's own client sends these for files.
+FILE_ACCEPT_TYPES = 'application/zip, application/x-zip-compressed, application/octet-stream'
+
 
 def main():
     file_endpoint_name = f'Activity file {ACTIVITY_ID}'
@@ -24,19 +27,14 @@ def main():
 
     access_token = get_access_token()
 
-    detail_path = f'/activity-service/activity/{ACTIVITY_ID}'
-    detail_bytes = get_garmin_bytes(detail_path, 'application/json', access_token)
-    detail_data = json.loads(detail_bytes)
-    save_payload(f'Activity detail {ACTIVITY_ID}', detail_data)
-
     # The file is a ZIP, kept as base64 text.
     file_path = f'/download-service/files/activity/{ACTIVITY_ID}'
-    file_bytes = get_garmin_bytes(file_path, 'application/zip', access_token)
+    file_bytes = get_garmin_bytes(file_path, FILE_ACCEPT_TYPES, access_token)
     file_text = base64.b64encode(file_bytes).decode()
     file_data = {'zip_base64': file_text}
     save_payload(file_endpoint_name, file_data)
 
-    print('Saved the activity detail and file.')
+    print('Saved the activity file.')
 
 
 def test_already_ran(endpoint_name):
