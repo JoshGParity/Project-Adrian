@@ -137,6 +137,11 @@ def build_user_day_row(user, pull_day, access_token):
     sleep_rem_minutes = seconds_to_minutes(sleep['remSleepSeconds'])
     sleep_awake_minutes = seconds_to_minutes(sleep['awakeSleepSeconds'])
 
+    # A day in progress may lack Body Battery.
+    body_battery = day_summary['bodyBattery']
+    body_battery_high = body_battery.get('maxValue')
+    body_battery_low = body_battery.get('minValue')
+
     user_day_row = {
         'garmin_user_id': day_summary['userProfilePk'],
         'first_name': user['first_name'],
@@ -146,8 +151,8 @@ def build_user_day_row(user, pull_day, access_token):
         'sleep_light_minutes': sleep_light_minutes,
         'sleep_rem_minutes': sleep_rem_minutes,
         'sleep_awake_minutes': sleep_awake_minutes,
-        'body_battery_high': day_summary['bodyBattery']['maxValue'],
-        'body_battery_low': day_summary['bodyBattery']['minValue'],
+        'body_battery_high': body_battery_high,
+        'body_battery_low': body_battery_low,
         'steps': day_summary['movement']['steps']['value'],
         'calories_total': day_summary['calories']['burnedTotal'],
         'calories_active': day_summary['calories']['burnedActive'],
@@ -192,11 +197,20 @@ def build_activity_row(garmin_user_id, activity, access_token):
 
     zone_minutes = get_zone_minutes(activity)
 
+    # Name and type stay empty if missing.
+    activity_name = activity.get('activityName')
+    activity_type = activity.get('activityType')
+    activity_type_key = None
+    if activity_type is not None:
+        activity_type_key = activity_type.get('typeKey')
+
     activity_row = {
         'garmin_user_id': garmin_user_id,
         'activity_id': activity_id,
         'day': activity_day,
         'start_time_local': start_time_local,
+        'activity_name': activity_name,
+        'activity_type': activity_type_key,
         'distance_meters': activity['distance'],
         'duration_seconds': activity['duration'],
         'calories': activity['calories'],
