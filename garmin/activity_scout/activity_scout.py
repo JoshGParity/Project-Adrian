@@ -42,6 +42,11 @@ def main():
     heart_rate_data = get_garmin_json(heart_rate_path, access_token)
     save_payload(f'Heart rate {today}', heart_rate_data)
 
+    # Today's zone floors, to count zone minutes.
+    zone_settings_path = '/biometric-service/heartRateZones/v2'
+    zone_settings = get_garmin_json(zone_settings_path, access_token)
+    save_payload(f'Heart-rate zone settings {today}', zone_settings)
+
     # Saved last, so a failed run can rerun.
     save_payload(SEARCH_ENDPOINT_NAME, activities)
 
