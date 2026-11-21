@@ -11,14 +11,6 @@ on:
         description: 'Last day to pull, as YYYY-MM-DD. Leave blank for the first day.'
         required: false
         default: ''
-      save_samples:
-        description: 'Save each raw Garmin answer to discovery_garmin_raw_payloads.'
-        required: false
-        default: 'no'
-        type: choice
-        options:
-          - 'no'
-          - 'yes'
 
 permissions:
   contents: read
@@ -42,5 +34,4 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           START_DAY: ${{ inputs.start_day }}
           END_DAY: ${{ inputs.end_day }}
-          SAVE_SAMPLES: ${{ inputs.save_samples }}
         run: python3 garmin/user_day/user_day_pull.py
