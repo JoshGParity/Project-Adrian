@@ -15,6 +15,7 @@ ACTIVITY_SEARCH_LIMIT = 100
 SECONDS_PER_MINUTE = 60
 GARMIN_TIMEOUT_SECONDS = 30
 WRITE_TIMEOUT_SECONDS = 20
+DEFAULT_LOOKBACK_DAYS = 3
 
 # Each user's Garmin key is its own secret.
 USERS = [
@@ -33,12 +34,16 @@ def main():
 
 
 def pick_pull_days():
-    # Blank start is yesterday. Blank end is start.
+    # Blank start and end re-pull the last three days.
     start_text = os.environ['START_DAY']
-    if start_text == '':
-        start_text = find_yesterday()
-
     end_text = os.environ['END_DAY']
+    if start_text == '' and end_text == '':
+        start_text = find_days_ago(DEFAULT_LOOKBACK_DAYS)
+        end_text = find_days_ago(1)
+
+    # Blank start is yesterday. Blank end is start.
+    if start_text == '':
+        start_text = find_days_ago(1)
     if end_text == '':
         end_text = start_text
 
@@ -58,13 +63,13 @@ def pick_pull_days():
     return pull_days
 
 
-def find_yesterday():
+def find_days_ago(days_back):
     chicago_zone = zoneinfo.ZoneInfo(LOCAL_TIME_ZONE)
     now = datetime.datetime.now(chicago_zone)
     today = now.date()
-    one_day = datetime.timedelta(days=1)
-    yesterday = today - one_day
-    return yesterday.isoformat()
+    back = datetime.timedelta(days=days_back)
+    past_day = today - back
+    return past_day.isoformat()
 
 
 def pull_user(user, pull_days):
@@ -120,20 +125,20 @@ def build_user_day_row(user, pull_day, access_token):
     # Read the day's summary and sleep.
     summary_path = f'/usersummary-service/v2/dailysummaries?startDate={pull_day}&endDate={pull_day}'
     summary_data = get_garmin_data(summary_path, access_token)
-    day_summary = summary_data['data'][0]
+    day_summary = summary_data.get('data')[0]
 
     sleep_path = f'/sleep-service/sleep/dailySleep?date={pull_day}'
     sleep = get_garmin_data(sleep_path, access_token)
 
     # Garmin sends sleep in seconds.
-    sleep_total_minutes = seconds_to_minutes(sleep['sleepTimeSeconds'])
-    sleep_deep_minutes = seconds_to_minutes(sleep['deepSleepSeconds'])
-    sleep_light_minutes = seconds_to_minutes(sleep['lightSleepSeconds'])
-    sleep_rem_minutes = seconds_to_minutes(sleep['remSleepSeconds'])
-    sleep_awake_minutes = seconds_to_minutes(sleep['awakeSleepSeconds'])
+    sleep_total_minutes = seconds_to_minutes(sleep.get('sleepTimeSeconds'))
+    sleep_deep_minutes = seconds_to_minutes(sleep.get('deepSleepSeconds'))
+    sleep_light_minutes = seconds_to_minutes(sleep.get('lightSleepSeconds'))
+    sleep_rem_minutes = seconds_to_minutes(sleep.get('remSleepSeconds'))
+    sleep_awake_minutes = seconds_to_minutes(sleep.get('awakeSleepSeconds'))
 
     user_day_row = {
-        'garmin_user_id': day_summary['userProfilePk'],
+        'garmin_user_id': day_summary.get('userProfilePk'),
         'first_name': user['first_name'],
         'day': pull_day,
         'sleep_total_minutes': sleep_total_minutes,
@@ -141,11 +146,11 @@ def build_user_day_row(user, pull_day, access_token):
         'sleep_light_minutes': sleep_light_minutes,
         'sleep_rem_minutes': sleep_rem_minutes,
         'sleep_awake_minutes': sleep_awake_minutes,
-        'body_battery_high': day_summary['bodyBattery']['maxValue'],
-        'body_battery_low': day_summary['bodyBattery']['minValue'],
-        'steps': day_summary['movement']['steps']['value'],
-        'calories_total': day_summary['calories']['burnedTotal'],
-        'calories_active': day_summary['calories']['burnedActive'],
+        'body_battery_high': get_nested(day_summary, ['bodyBattery', 'maxValue']),
+        'body_battery_low': get_nested(day_summary, ['bodyBattery', 'minValue']),
+        'steps': get_nested(day_summary, ['movement', 'steps', 'value']),
+        'calories_total': get_nested(day_summary, ['calories', 'burnedTotal']),
+        'calories_active': get_nested(day_summary, ['calories', 'burnedActive']),
     }
     return user_day_row
 
@@ -175,28 +180,31 @@ def build_activity_rows(garmin_user_id, pull_day, access_token):
 
 def build_activity_row(garmin_user_id, activity, access_token):
     # Min heart rate is only in the detail.
-    activity_id = activity['activityId']
+    activity_id = activity.get('activityId')
     detail_path = f'/activity-service/activity/{activity_id}'
     detail = get_garmin_data(detail_path, access_token)
-    min_hr = detail['summaryDTO']['minHR']
+    min_hr = get_nested(detail, ['summaryDTO', 'minHR'])
 
     # The day is the local start date.
-    start_time_local = activity['startTimeLocal']
+    start_time_local = activity.get('startTimeLocal')
     start_parts = start_time_local.split(' ')
     activity_day = start_parts[0]
 
     zone_minutes = get_zone_minutes(activity)
+
 
     activity_row = {
         'garmin_user_id': garmin_user_id,
         'activity_id': activity_id,
         'day': activity_day,
         'start_time_local': start_time_local,
-        'distance_meters': activity['distance'],
-        'duration_seconds': activity['duration'],
-        'calories': activity['calories'],
-        'avg_hr': activity['averageHR'],
-        'max_hr': activity['maxHR'],
+        'activity_name': activity.get('activityName'),
+        'activity_type': get_nested(activity, ['activityType', 'typeKey']),
+        'distance_meters': activity.get('distance'),
+        'duration_seconds': activity.get('duration'),
+        'calories': activity.get('calories'),
+        'avg_hr': activity.get('averageHR'),
+        'max_hr': activity.get('maxHR'),
         'min_hr': min_hr,
         'zone1_minutes': zone_minutes[0],
         'zone2_minutes': zone_minutes[1],
@@ -211,11 +219,26 @@ def get_zone_minutes(activity):
     # Garmin sends seconds in each zone.
     zone_minutes = []
     for zone in range(1, 6):
-        zone_seconds = activity[f'hrTimeInZone_{zone}']
+        zone_seconds = activity.get(f'hrTimeInZone_{zone}')
+        if zone_seconds is None:
+            zone_minutes.append(None)
+            continue
+
         minutes = zone_seconds / SECONDS_PER_MINUTE
         zone_minutes.append(minutes)
 
     return zone_minutes
+
+
+def get_nested(data, keys):
+    # Missing fields save empty; the re-pull fills them.
+    value = data
+    for i in range(len(keys)):
+        if value is None:
+            return None
+        value = value.get(keys[i])
+
+    return value
 
 
 def get_garmin_data(path, access_token):

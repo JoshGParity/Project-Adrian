@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       start_day:
-        description: 'First day to pull, as YYYY-MM-DD. Leave blank for yesterday.'
+        description: 'First day to pull, as YYYY-MM-DD. Leave both blank for the last 3 days.'
         required: false
         default: ''
       end_day:

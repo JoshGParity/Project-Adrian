@@ -140,6 +140,7 @@ def validate(data):
 - A function never cleans up another function's output. Fix the producer.
 - No `list()`, copies or guards "just in case". A wrapper that is truly needed says why in the comment above it.
 - Drop special cases the real data never has.
+- Exception, Garmin pulls: read every Garmin field with `.get()` and save what is there. The 3-day re-pull fills gaps.
 - The game is the only client. Timing fields are dead. `elapsed_seconds` stays for stats.
 - The server builds all game material. The game renders it.
 
