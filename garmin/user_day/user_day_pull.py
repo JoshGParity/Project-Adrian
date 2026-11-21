@@ -15,6 +15,7 @@ ACTIVITY_SEARCH_LIMIT = 100
 SECONDS_PER_MINUTE = 60
 GARMIN_TIMEOUT_SECONDS = 30
 WRITE_TIMEOUT_SECONDS = 20
+DEFAULT_LOOKBACK_DAYS = 3
 
 # Each user's Garmin key is its own secret.
 USERS = [
@@ -33,12 +34,16 @@ def main():
 
 
 def pick_pull_days():
-    # Blank start is yesterday. Blank end is start.
+    # Blank start and end re-pull the last three days.
     start_text = os.environ['START_DAY']
-    if start_text == '':
-        start_text = find_yesterday()
-
     end_text = os.environ['END_DAY']
+    if start_text == '' and end_text == '':
+        start_text = find_days_ago(DEFAULT_LOOKBACK_DAYS)
+        end_text = find_days_ago(1)
+
+    # Blank start is yesterday. Blank end is start.
+    if start_text == '':
+        start_text = find_days_ago(1)
     if end_text == '':
         end_text = start_text
 
@@ -58,13 +63,13 @@ def pick_pull_days():
     return pull_days
 
 
-def find_yesterday():
+def find_days_ago(days_back):
     chicago_zone = zoneinfo.ZoneInfo(LOCAL_TIME_ZONE)
     now = datetime.datetime.now(chicago_zone)
     today = now.date()
-    one_day = datetime.timedelta(days=1)
-    yesterday = today - one_day
-    return yesterday.isoformat()
+    back = datetime.timedelta(days=days_back)
+    past_day = today - back
+    return past_day.isoformat()
 
 
 def pull_user(user, pull_days):
