@@ -137,6 +137,8 @@ def build_user_day_row(user, pull_day, access_token):
     sleep_rem_minutes = seconds_to_minutes(sleep.get('remSleepSeconds'))
     sleep_awake_minutes = seconds_to_minutes(sleep.get('awakeSleepSeconds'))
 
+    pulled_at = find_pull_time()
+
     user_day_row = {
         'garmin_user_id': day_summary.get('userProfilePk'),
         'first_name': user['first_name'],
@@ -151,6 +153,7 @@ def build_user_day_row(user, pull_day, access_token):
         'steps': get_nested(day_summary, ['movement', 'steps', 'value']),
         'calories_total': get_nested(day_summary, ['calories', 'burnedTotal']),
         'calories_active': get_nested(day_summary, ['calories', 'burnedActive']),
+        'pulled_at': pulled_at,
     }
     return user_day_row
 
@@ -192,6 +195,7 @@ def build_activity_row(garmin_user_id, activity, access_token):
 
     zone_minutes = get_zone_minutes(activity)
 
+    pulled_at = find_pull_time()
 
     activity_row = {
         'garmin_user_id': garmin_user_id,
@@ -211,8 +215,15 @@ def build_activity_row(garmin_user_id, activity, access_token):
         'zone3_minutes': zone_minutes[2],
         'zone4_minutes': zone_minutes[3],
         'zone5_minutes': zone_minutes[4],
+        'pulled_at': pulled_at,
     }
     return activity_row
+
+
+def find_pull_time():
+    # The table default only stamps new rows.
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return now.isoformat()
 
 
 def get_zone_minutes(activity):
