@@ -1,0 +1,58 @@
+name: Garmin L7 page to GitHub Pages
+
+on:
+  # 4:33 AM Chicago standard time, after the 4:03 AM Garmin pull.
+  schedule:
+    - cron: '33 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: garmin-l7-pages
+  cancel-in-progress: false
+
+jobs:
+  build-l7-page:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      # Get the page and snapshot script from the repo.
+      - name: Check out the repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # Copy the page into a fresh site folder.
+      - name: Start the site folder
+        run: |
+          mkdir _site
+          cp garmin/l7_site/index.html _site/index.html
+
+      # Write the four data files. Logs show counts only.
+      - name: Write the L7 data files
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python3 garmin/l7_site/l7_snapshot.py _site
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy-l7-page:
+    needs: build-l7-page
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
