@@ -1,9 +1,7 @@
 name: Garmin L7 page to GitHub Pages
 
+# Supabase cron garmin_l7_pages starts this at 4:33 AM Chicago.
 on:
-  # 4:33 AM Chicago standard time, after the 4:03 AM Garmin pull.
-  schedule:
-    - cron: '33 10 * * *'
   workflow_dispatch:
 
 permissions:
