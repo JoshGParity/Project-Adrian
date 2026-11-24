@@ -26,6 +26,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # fitdecode reads each activity file.
+      - name: Install fitdecode
+        run: python3 -m pip install fitdecode==0.11.0
+
       # Write each user's days and activities. Logs show days and counts only.
       - name: Pull Garmin user days
         env:
