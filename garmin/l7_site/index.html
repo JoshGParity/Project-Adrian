@@ -9,9 +9,9 @@ html, body { margin: 0; background: #c8ecff; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
 <script>
-// Stands in for the claude.ai page runtime: loads the four JSON files next to this page.
+// Stands in for the claude.ai page runtime: loads the five JSON files next to this page.
 window.dash = (function () {
-  const names = ['days', 'activities', 'highlights', 'week'];
+  const names = ['days', 'activities', 'highlights', 'week', 'activity_hr'];
   const sources = {};
   const drawers = {};
   const listeners = [];
@@ -174,6 +174,8 @@ window.dash = (function () {
 .wr-zlist b { display: block; font-weight: normal; font-size: 10px; color: #fff; }
 .wr-zlist span { color: var(--muted); }
 .wr-hr { border: 2px dashed #4a54a0; min-height: 60px; display: grid; place-items: center; color: var(--muted); font-size: 10px; }
+.wr-hrchart svg { display: block; width: 100%; height: auto; margin-top: 6px; background: var(--panel2); box-shadow: 0 0 0 2px var(--k); border: 2px solid #fff; box-sizing: border-box; }
+.wr-hrchart text { font-family: 'WrPixel', monospace; font-size: 9px; fill: var(--muted); }
 
 /* activity card scenes */
 .wr-world-card { height: 100px; border-bottom: 3px solid var(--line); box-shadow: 0 3px 0 var(--k); margin-bottom: 4px; }
@@ -643,6 +645,54 @@ dash.draw('table', (tb) => {
 </script>
 
 <script>
+// Heart rate for each minute of one activity, over its zone bands.
+function wrHrChart(r, hrByActivity, zones, mk) {
+  const wrap = mk('div', 'wr-hrchart');
+  wrap.appendChild(mk('div', 'wr-k', 'Heart rate by minute'));
+  const rows = hrByActivity ? (hrByActivity.get(String(r.activity_id)) || []) : null;
+  if (!rows || !rows.length) {
+    wrap.appendChild(mk('div', 'wr-hr', rows ? 'No heart-rate minutes for this activity.' : 'Loading heart rate…'));
+    return wrap;
+  }
+  const W = 320, H = 150, m = {t: 8, r: 8, b: 20, l: 28};
+  const lastMinute = d3.max(rows, (h) => h.minute);
+  const byMinute = new Map(rows.map((h) => [h.minute, h.heart_rate]));
+  const points = d3.range(0, lastMinute + 1).map((mi) => ({minute: mi, hr: byMinute.has(mi || 1) ? byMinute.get(mi || 1) : null}));
+  const floors = [1, 2, 3, 4, 5].map((z) => r['zone' + z + '_floor_bpm']);
+  const hasFloors = floors.every((f) => f != null);
+  const hrs = rows.map((h) => h.heart_rate).filter((v) => v != null);
+  const lo = Math.min(d3.min(hrs), hasFloors ? floors[0] : Infinity) - 6;
+  const hi = Math.max(d3.max(hrs), hasFloors ? floors[3] : -Infinity) + 6;
+  const x = d3.scaleLinear([0, lastMinute], [m.l, W - m.r]);
+  const y = d3.scaleLinear([lo, hi], [H - m.b, m.t]);
+  const svg = d3.create('svg').attr('viewBox', '0 0 ' + W + ' ' + H).attr('role', 'img')
+    .attr('aria-label', 'Heart rate by minute for ' + lastMinute + ' minutes, from ' + d3.min(hrs) + ' to ' + d3.max(hrs) + ' bpm');
+  if (hasFloors) {
+    const edges = [lo].concat(floors, [hi]);
+    zones.forEach(([, , c], i) => {
+      const bottom = Math.max(edges[i], lo), top = Math.min(edges[i + 1], hi);
+      if (top <= bottom) return;
+      svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('y', y(top)).attr('height', y(bottom) - y(top)).attr('fill', c).attr('opacity', 0.32);
+    });
+    floors.forEach((f, i) => {
+      if (f <= lo || f >= hi) return;
+      svg.append('text').attr('x', m.l - 4).attr('y', y(f) + 3).attr('text-anchor', 'end').text(f);
+      svg.append('text').attr('x', W - m.r - 3).attr('y', y(f) - 3).attr('text-anchor', 'end').text('Z' + (i + 1));
+    });
+  } else {
+    y.ticks(4).forEach((t) => svg.append('text').attr('x', m.l - 4).attr('y', y(t) + 3).attr('text-anchor', 'end').text(t));
+  }
+  x.ticks(Math.min(6, lastMinute)).filter(Number.isInteger).forEach((t) => {
+    svg.append('text').attr('x', x(t)).attr('y', H - 6).attr('text-anchor', 'middle').text(t === 0 ? '0 min' : t);
+  });
+  const line = d3.line().defined((p) => p.hr != null).x((p) => x(p.minute)).y((p) => y(p.hr)).curve(d3.curveStepBefore);
+  svg.append('path').datum(points).attr('d', line).attr('fill', 'none').attr('stroke', '#1a1220').attr('stroke-width', 5).attr('stroke-linejoin', 'miter');
+  svg.append('path').datum(points).attr('d', line).attr('fill', 'none').attr('stroke', '#ffffff').attr('stroke-width', 2.5).attr('stroke-linejoin', 'miter');
+  wrap.appendChild(svg.node());
+  return wrap;
+}
+</script>
+<script>
 dash.draw('acts', (el) => {
   const s = dash.data('activities');
   if (s.status !== 'ok') { el.textContent = s.status === 'error' ? 'Activities failed to load.' : '—'; return; }
@@ -654,6 +704,8 @@ dash.draw('acts', (el) => {
   if (!rows.length) { el.textContent = 'No activities this week.'; return; }
   const unit = window.wr.unit;
   const colors = dash.colors;
+  const hrSource = dash.data('activity_hr') || {status: 'loading'};
+  const hrByActivity = hrSource.status === 'ok' ? d3.group(hrSource.data, (h) => String(h.activity_id)) : null;
   const nav = document.createElement('div');
   nav.className = 'wr-nav';
   const prev = document.createElement('button');
@@ -717,7 +769,7 @@ dash.draw('acts', (el) => {
     });
     zwrap.appendChild(zl);
     card.appendChild(zwrap);
-    card.appendChild(mk('div', 'wr-hr', 'HR over time: soon'));
+    card.appendChild(wrHrChart(r, hrByActivity, zones, mk));
     track.appendChild(card);
   });
   el.append(nav, track);

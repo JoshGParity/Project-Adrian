@@ -1,4 +1,4 @@
-"""Write the L7 fitness page's four data files from Supabase."""
+"""Write the L7 fitness page's five data files from Supabase."""
 
 import datetime
 import decimal
@@ -12,6 +12,7 @@ import zoneinfo
 LOCAL_TIME_ZONE = 'America/Chicago'
 USER_DAY_TABLE_PATH = '/rest/v1/user_day'
 ACTIVITY_TABLE_PATH = '/rest/v1/user_day_activity'
+ACTIVITY_HR_TABLE_PATH = '/rest/v1/user_day_activity_hr'
 READ_TIMEOUT_SECONDS = 20
 WINDOW_DAYS_BACK = 6
 JOSH_GARMIN_USER_ID = 152786074
@@ -21,6 +22,7 @@ HOURS_PER_HALF_DAY = 12
 METERS_PER_KILOMETER = decimal.Decimal('1000')
 METERS_PER_MILE = decimal.Decimal('1609.344')
 ZONE_FIELDS = ['zone1_minutes', 'zone2_minutes', 'zone3_minutes', 'zone4_minutes', 'zone5_minutes']
+ZONE_FLOOR_FIELDS = ['zone1_floor_bpm', 'zone2_floor_bpm', 'zone3_floor_bpm', 'zone4_floor_bpm', 'zone5_floor_bpm']
 
 
 def main():
@@ -38,14 +40,16 @@ def main():
     activities = build_activities(day_rows, activity_rows)
     highlights = build_highlights(day_rows, activity_rows)
     week = build_week(day_rows, activity_rows, first_day, today)
+    activity_hr = build_activity_hr(activity_rows)
 
     write_file(site_folder, 'days.json', days)
     write_file(site_folder, 'activities.json', activities)
     write_file(site_folder, 'highlights.json', highlights)
     write_file(site_folder, 'week.json', week)
+    write_file(site_folder, 'activity_hr.json', activity_hr)
 
     # Logs show counts only.
-    print(f'{first_day} to {today}: {len(days)} days, {len(activities)} activities.')
+    print(f'{first_day} to {today}: {len(days)} days, {len(activities)} activities, {len(activity_hr)} heart-rate minutes.')
 
 
 def read_rows(table_path, first_day, last_day, order):
@@ -66,6 +70,26 @@ def read_rows(table_path, first_day, last_day, order):
     # Decimals keep Postgres numerics exact for rounding.
     response = urllib.request.urlopen(read_request, timeout=READ_TIMEOUT_SECONDS)
     rows = json.loads(response.read(), parse_float=decimal.Decimal)
+    response.close()
+    return rows
+
+
+def read_activity_hr_rows(activity_id):
+    # One activity's minutes, first minute first.
+    supabase_url = os.environ['SUPABASE_URL']
+    query = urllib.parse.urlencode([
+        ('select', 'activity_id,minute,heart_rate'),
+        ('activity_id', 'eq.' + str(activity_id)),
+        ('order', 'minute.asc'),
+    ])
+    table_url = supabase_url + ACTIVITY_HR_TABLE_PATH + '?' + query
+
+    secret_key = os.environ['SUPABASE_SECRET_KEY']
+    read_headers = {'apikey': secret_key, 'Accept': 'application/json'}
+    read_request = urllib.request.Request(table_url, headers=read_headers)
+
+    response = urllib.request.urlopen(read_request, timeout=READ_TIMEOUT_SECONDS)
+    rows = json.loads(response.read())
     response.close()
     return rows
 
@@ -126,10 +150,31 @@ def build_activities(day_rows, activity_rows):
         for j in range(len(ZONE_FIELDS)):
             field = ZONE_FIELDS[j]
             activity[field] = round_to_places(activity_row[field], 1)
+        for j in range(len(ZONE_FLOOR_FIELDS)):
+            field = ZONE_FLOOR_FIELDS[j]
+            activity[field] = activity_row[field]
 
         activities.append(activity)
 
     return activities
+
+
+def build_activity_hr(activity_rows):
+    # Read each activity alone to stay under the row cap.
+    activity_hr = []
+    for i in range(len(activity_rows)):
+        activity_id = activity_rows[i]['activity_id']
+        hr_rows = read_activity_hr_rows(activity_id)
+        for j in range(len(hr_rows)):
+            hr_row = hr_rows[j]
+            minute_row = {
+                'activity_id': str(hr_row['activity_id']),
+                'minute': hr_row['minute'],
+                'heart_rate': hr_row['heart_rate'],
+            }
+            activity_hr.append(minute_row)
+
+    return activity_hr
 
 
 def find_first_names(day_rows):

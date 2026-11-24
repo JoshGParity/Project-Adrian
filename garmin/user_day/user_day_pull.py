@@ -98,17 +98,24 @@ def pull_user(user, pull_days):
 
         garmin_user_id = user_day_row['garmin_user_id']
         activity_rows = build_activity_rows(garmin_user_id, pull_day, access_token)
+
+        # Each activity file adds zone floors and minute rows.
+        hr_rows = []
+        for j in range(len(activity_rows)):
+            activity_row = activity_rows[j]
+            activity_id = activity_row['activity_id']
+            activity_file = read_activity_file(activity_id, access_token)
+            add_zone_floors(activity_row, activity_file['zone_floors'])
+
+            activity_hr_rows = build_activity_hr_rows(activity_id, activity_file['records'])
+            for k in range(len(activity_hr_rows)):
+                hr_rows.append(activity_hr_rows[k])
+
         if len(activity_rows) > 0:
             write_rows(ACTIVITY_TABLE_PATH, activity_rows)
-
-        # Write each activity's heart rate by minute.
-        num_hr_minutes = 0
-        for j in range(len(activity_rows)):
-            activity_id = activity_rows[j]['activity_id']
-            hr_rows = build_activity_hr_rows(activity_id, access_token)
-            if len(hr_rows) > 0:
-                write_rows(ACTIVITY_HR_TABLE_PATH, hr_rows)
-            num_hr_minutes = num_hr_minutes + len(hr_rows)
+        if len(hr_rows) > 0:
+            write_rows(ACTIVITY_HR_TABLE_PATH, hr_rows)
+        num_hr_minutes = len(hr_rows)
 
         # Log the day and counts only.
         num_activities = len(activity_rows)
@@ -245,10 +252,59 @@ def get_zone_minutes(activity):
     return zone_minutes
 
 
-def build_activity_hr_rows(activity_id, access_token):
-    # The activity file holds one record per second.
+def read_activity_file(activity_id, access_token):
+    # The file holds one record per second.
     fit_bytes = get_activity_file(activity_id, access_token)
-    records = read_hr_records(activity_id, fit_bytes)
+    fit_stream = io.BytesIO(fit_bytes)
+
+    records = []
+    zone_floors = [None, None, None, None, None]
+    with fitdecode.FitReader(fit_stream) as fit_reader:
+        for frame in fit_reader:
+            if frame.frame_type != fitdecode.FIT_FRAME_DATA:
+                continue
+
+            if frame.name == 'time_in_zone':
+                read_zone_floors(frame, zone_floors)
+                continue
+
+            if frame.name != 'record':
+                continue
+
+            timestamp = frame.get_value('timestamp', fallback=None)
+            if timestamp is None:
+                continue
+
+            heart_rate = frame.get_value('heart_rate', fallback=None)
+            record = {'timestamp': timestamp, 'heart_rate': heart_rate}
+            records.append(record)
+
+    activity_file = {'records': records, 'zone_floors': zone_floors}
+    return activity_file
+
+
+def read_zone_floors(frame, zone_floors):
+    # Only the whole-activity zones count, not laps.
+    reference = frame.get_value('reference_mesg', fallback=None)
+    if reference != 'session':
+        return
+
+    # Bounds list zone 1 to 5 floors, then max HR.
+    bounds = frame.get_value('hr_zone_high_boundary', fallback=None)
+    if bounds is None:
+        return
+
+    for i in range(len(zone_floors)):
+        zone_floors[i] = bounds[i]
+
+
+def add_zone_floors(activity_row, zone_floors):
+    for i in range(len(zone_floors)):
+        zone = i + 1
+        activity_row[f'zone{zone}_floor_bpm'] = zone_floors[i]
+
+
+def build_activity_hr_rows(activity_id, records):
     if len(records) == 0:
         return []
 
@@ -303,44 +359,6 @@ def get_activity_file(activity_id, access_token):
     fit_bytes = zip_file.read(file_names[0])
     zip_file.close()
     return fit_bytes
-
-
-def read_hr_records(activity_id, fit_bytes):
-    records = []
-    fit_stream = io.BytesIO(fit_bytes)
-    with fitdecode.FitReader(fit_stream) as fit_reader:
-        for frame in fit_reader:
-            if frame.frame_type != fitdecode.FIT_FRAME_DATA:
-                continue
-
-            # Print zone bounds once, to check the zone bands.
-            if frame.name == 'time_in_zone':
-                print_zone_bounds(activity_id, frame)
-                continue
-
-            if frame.name != 'record':
-                continue
-
-            timestamp = frame.get_value('timestamp', fallback=None)
-            if timestamp is None:
-                continue
-
-            heart_rate = frame.get_value('heart_rate', fallback=None)
-            record = {'timestamp': timestamp, 'heart_rate': heart_rate}
-            records.append(record)
-
-    return records
-
-
-def print_zone_bounds(activity_id, frame):
-    # Only the whole-activity zones matter.
-    reference = frame.get_value('reference_mesg', fallback=None)
-    if reference != 'session':
-        return
-
-    bounds = frame.get_value('hr_zone_high_boundary', fallback=None)
-    hr_calc_type = frame.get_value('hr_calc_type', fallback=None)
-    print(f'Zone bounds {activity_id}: {bounds} ({hr_calc_type})')
 
 
 def get_nested(data, keys):
