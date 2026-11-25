@@ -1,16 +1,23 @@
 """Pull Garmin days and activities for each user into Supabase."""
 
 import datetime
+import io
 import json
 import os
 import urllib.request
+import zipfile
 import zoneinfo
+
+import fitdecode
 
 LOCAL_TIME_ZONE = 'America/Chicago'
 GARMIN_API_URL = 'https://personal.connectapi.garmin.com'
 TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
 USER_DAY_TABLE_PATH = '/rest/v1/user_day'
 ACTIVITY_TABLE_PATH = '/rest/v1/user_day_activity'
+ACTIVITY_HR_TABLE_PATH = '/rest/v1/user_day_activity_hr'
+# Garmin's own client sends this list (client.py L303, commit 958ef58).
+ACTIVITY_FILE_ACCEPT = 'application/zip, application/x-zip-compressed, application/octet-stream'
 ACTIVITY_SEARCH_LIMIT = 100
 SECONDS_PER_MINUTE = 60
 GARMIN_TIMEOUT_SECONDS = 30
@@ -91,12 +98,28 @@ def pull_user(user, pull_days):
 
         garmin_user_id = user_day_row['garmin_user_id']
         activity_rows = build_activity_rows(garmin_user_id, pull_day, access_token)
+
+        # Each activity file adds zone floors and minute rows.
+        hr_rows = []
+        for j in range(len(activity_rows)):
+            activity_row = activity_rows[j]
+            activity_id = activity_row['activity_id']
+            activity_file = read_activity_file(activity_id, access_token)
+            add_zone_floors(activity_row, activity_file['zone_floors'])
+
+            activity_hr_rows = build_activity_hr_rows(activity_id, activity_file['records'])
+            for k in range(len(activity_hr_rows)):
+                hr_rows.append(activity_hr_rows[k])
+
         if len(activity_rows) > 0:
             write_rows(ACTIVITY_TABLE_PATH, activity_rows)
+        if len(hr_rows) > 0:
+            write_rows(ACTIVITY_HR_TABLE_PATH, hr_rows)
+        num_hr_minutes = len(hr_rows)
 
-        # Log the day and count only.
+        # Log the day and counts only.
         num_activities = len(activity_rows)
-        print(f'Wrote {user["first_name"]} {pull_day}: {num_activities} activities.')
+        print(f'Wrote {user["first_name"]} {pull_day}: {num_activities} activities, {num_hr_minutes} heart-rate minutes.')
 
 
 def get_access_token(garmin_key):
@@ -239,6 +262,122 @@ def get_zone_minutes(activity):
         zone_minutes.append(minutes)
 
     return zone_minutes
+
+
+def read_activity_file(activity_id, access_token):
+    # The file holds one record per second.
+    fit_bytes = get_activity_file(activity_id, access_token)
+    fit_stream = io.BytesIO(fit_bytes)
+
+    records = []
+    zone_floors = [None, None, None, None, None]
+    with fitdecode.FitReader(fit_stream) as fit_reader:
+        for frame in fit_reader:
+            if frame.frame_type != fitdecode.FIT_FRAME_DATA:
+                continue
+
+            if frame.name == 'time_in_zone':
+                read_zone_floors(frame, zone_floors)
+                continue
+
+            if frame.name != 'record':
+                continue
+
+            timestamp = frame.get_value('timestamp', fallback=None)
+            if timestamp is None:
+                continue
+
+            heart_rate = frame.get_value('heart_rate', fallback=None)
+            record = {'timestamp': timestamp, 'heart_rate': heart_rate}
+            records.append(record)
+
+    activity_file = {'records': records, 'zone_floors': zone_floors}
+    return activity_file
+
+
+def read_zone_floors(frame, zone_floors):
+    # Only the whole-activity zones count, not laps.
+    reference = frame.get_value('reference_mesg', fallback=None)
+    if reference != 'session':
+        return
+
+    # Bounds list zone 1 to 5 floors, then max HR.
+    bounds = frame.get_value('hr_zone_high_boundary', fallback=None)
+    if bounds is None:
+        return
+
+    for i in range(len(zone_floors)):
+        zone_floors[i] = bounds[i]
+
+
+def add_zone_floors(activity_row, zone_floors):
+    for i in range(len(zone_floors)):
+        zone = i + 1
+        activity_row[f'zone{zone}_floor_bpm'] = zone_floors[i]
+
+
+def build_activity_hr_rows(activity_id, records):
+    if len(records) == 0:
+        return []
+
+    # Minute 1 is the first 60 seconds.
+    first_time = records[0]['timestamp']
+    minute_totals = {}
+    minute_counts = {}
+    for i in range(len(records)):
+        record = records[i]
+        heart_rate = record['heart_rate']
+        if heart_rate is None:
+            continue
+
+        elapsed = record['timestamp'] - first_time
+        elapsed_seconds = elapsed.total_seconds()
+        whole_minutes = elapsed_seconds // SECONDS_PER_MINUTE
+        minute = int(whole_minutes) + 1
+        if minute not in minute_totals:
+            minute_totals[minute] = 0
+            minute_counts[minute] = 0
+        minute_totals[minute] = minute_totals[minute] + heart_rate
+        minute_counts[minute] = minute_counts[minute] + 1
+
+    pulled_at = find_pull_time()
+
+    # Each minute saves its average, to the nearest bpm.
+    hr_rows = []
+    # Records come in time order, so minutes do too.
+    minutes = list(minute_totals)
+    for i in range(len(minutes)):
+        minute = minutes[i]
+        average = minute_totals[minute] / minute_counts[minute]
+        heart_rate = int(average + 0.5)
+        hr_row = {
+            'activity_id': activity_id,
+            'minute': minute,
+            'heart_rate': heart_rate,
+            'pulled_at': pulled_at,
+        }
+        hr_rows.append(hr_row)
+
+    return hr_rows
+
+
+def get_activity_file(activity_id, access_token):
+    # Garmin sends the file inside a zip.
+    file_url = f'{GARMIN_API_URL}/download-service/files/activity/{activity_id}'
+    file_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': ACTIVITY_FILE_ACCEPT}
+    file_request = urllib.request.Request(file_url, headers=file_headers)
+
+    response = urllib.request.urlopen(file_request, timeout=GARMIN_TIMEOUT_SECONDS)
+    zip_bytes = response.read()
+    response.close()
+
+    # The zip holds one .fit file.
+    zip_stream = io.BytesIO(zip_bytes)
+    zip_file = zipfile.ZipFile(zip_stream)
+    file_names = zip_file.namelist()
+    fit_bytes = zip_file.read(file_names[0])
+    zip_file.close()
+    return fit_bytes
 
 
 def get_nested(data, keys):
