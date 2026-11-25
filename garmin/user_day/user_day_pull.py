@@ -160,6 +160,8 @@ def build_user_day_row(user, pull_day, access_token):
     sleep_rem_minutes = seconds_to_minutes(sleep.get('remSleepSeconds'))
     sleep_awake_minutes = seconds_to_minutes(sleep.get('awakeSleepSeconds'))
 
+    pulled_at = find_pull_time()
+
     user_day_row = {
         'garmin_user_id': day_summary.get('userProfilePk'),
         'first_name': user['first_name'],
@@ -174,6 +176,7 @@ def build_user_day_row(user, pull_day, access_token):
         'steps': get_nested(day_summary, ['movement', 'steps', 'value']),
         'calories_total': get_nested(day_summary, ['calories', 'burnedTotal']),
         'calories_active': get_nested(day_summary, ['calories', 'burnedActive']),
+        'pulled_at': pulled_at,
     }
     return user_day_row
 
@@ -215,6 +218,8 @@ def build_activity_row(garmin_user_id, activity, access_token):
 
     zone_minutes = get_zone_minutes(activity)
 
+    pulled_at = find_pull_time()
+
     activity_row = {
         'garmin_user_id': garmin_user_id,
         'activity_id': activity_id,
@@ -233,8 +238,15 @@ def build_activity_row(garmin_user_id, activity, access_token):
         'zone3_minutes': zone_minutes[2],
         'zone4_minutes': zone_minutes[3],
         'zone5_minutes': zone_minutes[4],
+        'pulled_at': pulled_at,
     }
     return activity_row
+
+
+def find_pull_time():
+    # The table default only stamps new rows.
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return now.isoformat()
 
 
 def get_zone_minutes(activity):
@@ -328,6 +340,8 @@ def build_activity_hr_rows(activity_id, records):
         minute_totals[minute] = minute_totals[minute] + heart_rate
         minute_counts[minute] = minute_counts[minute] + 1
 
+    pulled_at = find_pull_time()
+
     # Each minute saves its average, to the nearest bpm.
     hr_rows = []
     # Records come in time order, so minutes do too.
@@ -336,7 +350,12 @@ def build_activity_hr_rows(activity_id, records):
         minute = minutes[i]
         average = minute_totals[minute] / minute_counts[minute]
         heart_rate = int(average + 0.5)
-        hr_row = {'activity_id': activity_id, 'minute': minute, 'heart_rate': heart_rate}
+        hr_row = {
+            'activity_id': activity_id,
+            'minute': minute,
+            'heart_rate': heart_rate,
+            'pulled_at': pulled_at,
+        }
         hr_rows.append(hr_row)
 
     return hr_rows
